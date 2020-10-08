@@ -22,11 +22,15 @@
 #define PRINT_ROUTE_ON 1
 
 
-/* if off, BLACKHOLE all UDP messages will be intercepted. Else randomly choose y/n */
-#define GREY_SINK_HOLE_ATTACK 1
+/* if off, BLACKHOLE all UDP messages will be intercepted. 
+ *	Else randomly choose y/n 
+ */
+#define GREY_SINK_HOLE_ATTACK 0
 /* How much to lower the rank of the malicious node in rpl-icmp6.c */
-#define MALICIOUS_LEVEL 1
+#define MALICIOUS_LEVEL 2
 
+/* Make sure it is the same with legitimate nodes */
+#define PERIOD 300
 
 /* 2018-10-20 George: Control the printing of 
  * accumulated ICMP messages in EVERY node

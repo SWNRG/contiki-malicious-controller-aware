@@ -26,6 +26,7 @@
  *	Else randomly choose y/n 
  */
 #define GREY_SINK_HOLE_ATTACK 0
+
 /* How much to lower the rank of the malicious node in rpl-icmp6.c */
 #define MALICIOUS_LEVEL 2
 

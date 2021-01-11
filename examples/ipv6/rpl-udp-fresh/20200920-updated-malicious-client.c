@@ -264,7 +264,7 @@ monitor_ver_num(void) //TODO: Implement this method
 		uip_udp_packet_sendto(client_conn, buf, strlen(buf),
 					  &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 	}	
-	// Hardcoding ver_num_attacks. Use the adaptable algorithm in ARRESTOR paper
+	// Hardcoding ver_num_attacks. Use the adaptable algorithm in ASSET paper
 	if(ver_num_attacks>20){
 		ignore_version_number_incos=1;
 		ver_num_attacks=20; //make sure that it does not crash...
@@ -386,7 +386,18 @@ PROCESS_THREAD(udp_client_process, ev, data)
 	printf("MAL-NODE: DATA Intercept: %d, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %\n",
 						intercept_on, MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
 	printf("GREY_SINK_HOLE_ATTACK == 0 ==> BLACK_SINK_HOLE_ATTACK ON\n");
-				 
+	
+	
+	
+	// setting on blackhole attack from the begining. 
+	intercept_on = 1;
+	
+	
+#define FULL_MODE 0
+#if FULL_MODE      
+      sendICMP = 1 ;
+      sendUDP = 1;
+#endif 	
 				   	 
   etimer_set(&periodic, SEND_INTERVAL);
   while(1) {
@@ -402,13 +413,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
     if(etimer_expired(&periodic)) {
       etimer_reset(&periodic);
 
-      counter++;
-      
-#define FULL_MODE 1
-#if FULL_MODE      
-      sendICMP = 1 ;
-      sendUDP = 1;
-#endif      
+      counter++;     
       
       /* sending periodic data to sink (e.g. temperature measurements) */
       ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);   
@@ -497,7 +502,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
   }
   PROCESS_END();
 }
-/*-----------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
 static uint8_t active;
 PROCESS_THREAD(malicious_node_actions, ev, data)
 {

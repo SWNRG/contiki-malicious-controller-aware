@@ -519,24 +519,42 @@ dio_output(rpl_instance_t *instance, uip_ipaddr_t *uc_addr)
    int fake_rank; 
    switch(MALICIOUS_LEVEL){ 
 	  case 4:
-		 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD > 				       	 
-		 	 2*PARENT_SWITCH_THRESHOLD ?
-			 dag->rank - 8*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;	 
-	  	 break;
+		  if(dag->rank != -1){ // TODO: for some reason >128 did not work...
+			 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD > 				       	 
+			 	 2*PARENT_SWITCH_THRESHOLD ?
+				 dag->rank - 8*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;	 
+	  	  }else{
+		 	 fake_rank = PARENT_SWITCH_THRESHOLD+1; // TODO: improve it
+		  }
+		  break;
 	  case 3:
-		 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD > 				       	 
-		 	 2*PARENT_SWITCH_THRESHOLD ?
-			 dag->rank - 6*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;	 
+		  if(dag->rank != -1){
+			 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD > 				       	 
+			 	 2*PARENT_SWITCH_THRESHOLD ?
+				 dag->rank - 6*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;	 
+		  }else{
+		 	 fake_rank = PARENT_SWITCH_THRESHOLD+1;
+		  }
 	  	 break;
 	  case 2:
-		 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD > 
-		 	 2*PARENT_SWITCH_THRESHOLD ?
-			 dag->rank - 4*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;		 
+	  	 //printf("dag->rank: %d\n", dag->rank);
+	  	 if(dag->rank != -1){
+			 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD > 
+			 	 2*PARENT_SWITCH_THRESHOLD ?
+				 dag->rank - 4*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;	
+		 }else {
+		 	fake_rank = PARENT_SWITCH_THRESHOLD+1;
+		 }			 	 
 	    break;
 	  case 1:
-		 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD >
-		 	 2*PARENT_SWITCH_THRESHOLD ?
-			 dag->rank - 2*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;		 
+	  	 if(dag->rank != -1){
+	  	 	 //printf("dag->rank: %d\n", dag->rank);
+	  	 	 fake_rank = dag->rank - 3*PARENT_SWITCH_THRESHOLD >
+		 		 2*PARENT_SWITCH_THRESHOLD ?
+				 dag->rank - 2*PARENT_SWITCH_THRESHOLD : PARENT_SWITCH_THRESHOLD;	
+		 }else {
+		 	fake_rank = PARENT_SWITCH_THRESHOLD+1;
+		 }	 
 	    break; 
 	  default: // All other number
  	  		PRINTF("No MALICIOUS_LEVEL set, NORMAL dag->rank\n");

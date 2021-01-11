@@ -343,6 +343,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
 	while(1) {
 		PROCESS_YIELD();
 
+/* participating to slim-mode as a ''normal'' node */
 		monitor_DAO();
 
 

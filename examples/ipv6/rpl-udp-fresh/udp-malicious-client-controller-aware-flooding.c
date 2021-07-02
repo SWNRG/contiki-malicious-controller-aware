@@ -27,7 +27,7 @@
 #endif
 
 #ifndef PERIOD
-#define PERIOD 500 /* increase it to 700 avoid flooding */
+#define PERIOD 300 /* increase it to 700 avoid flooding */
 #endif
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
@@ -58,6 +58,9 @@ static uint8_t sendUDP = 0;
 /* When this variable is true, start sending ICMP stats */
 static uint8_t sendICMP = 0; 
 
+/* Dynamically adjust the period for flooding attack */
+int dynamic_period = 300;
+	
 static int counter=0; //counting rounds.
 
 /* uip6.c intercepting UDP packets */
@@ -180,7 +183,7 @@ send_packet(void *ptr)
 
    seq_id++; // TODO: change this with a random var
 
-	PRINTF("DATA sending to %d 'Hello %d'\n",
+	printf("DATA sending to %d 'Hello %d'\n",
 			server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], seq_id);
 
 	sprintf(buf, "Custom Data %d ", seq_id);
@@ -302,12 +305,6 @@ PROCESS_THREAD(udp_client_process, ev, data)
 	PROCESS_PAUSE();
 
 	set_global_address();
-	if(GREY_SINK_HOLE_ATTACK ==  1){
-		printf("Greyhole is on by 50%. Activate it by button\n");
-	}
-	else{
-		printf("Blackhole is on. Activate it by button\n");
-	}
 	
 	/* The data sink runs with a 100% duty cycle in order to ensure high 
 	  packet reception rates. */
@@ -317,7 +314,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
 		   NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
 
 	print_local_addresses();
-	printf("MALICIOUS_LEVEL: %d (if 0, no RANK ATTACK)\n",MALICIOUS_LEVEL);
+	printf("FLOODING ATTACK PERIOD:%d (if PERIOD==300, no ATTACK)\n",dynamic_period);
 	
 	/* new connection with remote host */
 	client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
@@ -345,8 +342,20 @@ PROCESS_THREAD(udp_client_process, ev, data)
 
 /* printing details for intercepted messages */
 #define PRINT_DETAILS 1
-
+ 
+	/* PERIOD is dynamically adjusted to implement flooding attack 
+	 * Original SEND_INTERVAL=(PERIOD * CLOCK_SECOND)
+	 * Altered send_interval = dynamic_period * 128
+	 * Either define the period from the beggining on the top of
+	 * the file, or just click the button to alter it
+	 */
+	int send_interval = dynamic_period * 128;
+	
+	printf("Be careful, static CLOCK_SECOND: %d\n", CLOCK_SECOND);
+	
 	etimer_set(&periodic, SEND_INTERVAL);
+	//printf("Current dynamic_period:%d", dynamic_period);
+	
 	while(1) {
 		PROCESS_YIELD();
 
@@ -364,70 +373,7 @@ PROCESS_THREAD(udp_client_process, ev, data)
 			 counter++;	 
 			 PRINTF("Counter %d\n",counter); 
 			 
-			/* Implementing grayhole attack even at the attacker.
-			* This is kind of cheating, but it makes very easy for the graph
-			* algorithms to find the 'mother' of the attack, as a mother of a
-			* strongly connected graph. Else, there must be a routine to find 
-			* the common and unique ancestor of all attacked nodes. This is then
-			* the attacker.
-			*
-			* BE CAREFUL: random_rand() returns ONLY EVEN NUMBERS. Hence, %4
-			* will return either 0 or 2 (random boolean variable)
-			* 
-			* sendON = (int)random_rand()%2; 
-			* returns all zeros (0)
-			*/
-
-			if(intercept_on == 1){
-			  if(GREY_SINK_HOLE_ATTACK == 1){
-			  		//%2 returns only zeros
-			  		uint8_t randomSend = (uint8_t)random_rand()%100; 
-#if PRINT_DETAILS
-					printf("MAL-NODE: randomSend in malicious node:%d\n",randomSend);
-#endif				 	
-				 	/* decide randomly to send or not (greyhole attack) */	  
-					if(randomSend < 50 ){ //it seems more trully random like this...
-						ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL); 
-#if PRINT_DETAILS
-						printf("MAL-NODE: my UDP data RANDOMLY sent to sink...\n");  
-#endif
-					}else{ 
-#if PRINT_DETAILS
-						printf("MAL-NODE: my UDP data randomly NOT sent\n");
-#endif
-					}
-			 	}else{ /* intercept == 1 && GREY_SINK_HOLE_ATTACK == 0 */
-#if PRINT_DETAILS
-			 		printf("MAL-NODE: Blackhole attack ON, My msg dropped...\n");
-#endif
-			 	}			 		
-			}else{ /* intercept == 0, regular operation */
-						ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL); 
-#if PRINT_DETAILS
-						printf("my UDP data regularly sent to sink...\n");  
-#endif
-			}
-
-/* Check the 2nd thread for manual start/stop of malicious activities */
-			if (counter == 500){ //start malicious behavior
-				 intercept_on = 1;
-				 printf("R:%d, MAL-NODE: DATA Intercept:%d, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %d\n", 
-						counter,intercept_on, MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
-				 printf("If GREY_SINK_HOLE_ATTACK == 0, it means BLACK_SINK_HOLE_ATTACK\n");
-				 
-				 sprintf(buf, "R:%d,DATA INTERCEPT ON, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %d\n", 
-						MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
-				 uip_udp_packet_sendto(client_conn, buf, strlen(buf),
-									&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));                 		
-			} 
-
-			if (counter == 500){ // end malicious behavior
-				 intercept_on = 0;
-				 printf("MAL-NODE: DATA Intercept:%d........................\n",counter,intercept_on);
-				 sprintf(buf, "DATA Intercept END........................\n");
-				 uip_udp_packet_sendto(client_conn, buf, strlen(buf),
-									&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
-			}
+			 ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);
 
 			/****** Nothing beyond this point ******************/
 			
@@ -456,12 +402,12 @@ PROCESS_THREAD(malicious_node_actions, ev, data)
     PROCESS_WAIT_EVENT_UNTIL(ev == sensors_event &&
 			     data == &button_sensor);
     if(!active) {
-				 intercept_on = 1;
-				 printf("MAL-NODE: intercept ON\n");
+      /* set period to 100*/
+		dynamic_period = 100;
+		printf("FLOODING ON! PERIOD SET TO: %d\n", dynamic_period); 
     } else {
-      /* deactivate malicious actions */
-				 intercept_on = 0;
-				 printf("MAL-NODE: intercept OFF\n");
+      /* return period to original 300*/
+		dynamic_period = 300;
     }
     active ^= 1;
   }

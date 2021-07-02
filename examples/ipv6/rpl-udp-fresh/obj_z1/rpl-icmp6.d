@@ -37,7 +37,7 @@ obj_z1/rpl-icmp6.o: ../../../core/net/rpl/rpl-icmp6.c \
  ../../../core/./net/ipv6/multicast/uip-mcast6-stats.h \
  ../../../core/./net/packetbuf.h ../../../core/./net/mac/tsch/tsch-conf.h \
  ../../../core/lib/random.h ../../../core/./net/ip/uip-debug.h \
- ../../../core/./net/net-debug.h
+ ../../../core/./net/net-debug.h ../../../core/./net/rpl/icmp6-extern.h
 ../../../core/net/rpl/rpl-icmp6.c :
  ../../../core/./net/ip/tcpip.h ../../../core/./contiki.h :
  ../../../core/./contiki-version.h ../../../platform/z1/./contiki-conf.h :
@@ -77,4 +77,4 @@ obj_z1/rpl-icmp6.o: ../../../core/net/rpl/rpl-icmp6.c \
  ../../../core/./net/ipv6/multicast/uip-mcast6-stats.h :
  ../../../core/./net/packetbuf.h ../../../core/./net/mac/tsch/tsch-conf.h :
  ../../../core/lib/random.h ../../../core/./net/ip/uip-debug.h :
- ../../../core/./net/net-debug.h :
+ ../../../core/./net/net-debug.h ../../../core/./net/rpl/icmp6-extern.h :

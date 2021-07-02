@@ -27,7 +27,7 @@
 #endif
 
 #ifndef PERIOD
-#define PERIOD 500 /* increase it to 700 avoid flooding */
+#define PERIOD 300 /* increase it to 700 avoid flooding */
 #endif
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
@@ -409,12 +409,15 @@ PROCESS_THREAD(udp_client_process, ev, data)
 			}
 
 /* Check the 2nd thread for manual start/stop of malicious activities */
-			if (counter == 500){ //start malicious behavior
+			if (counter == 16){ //start malicious behavior at 01:20
 				 intercept_on = 1;
-				 printf("R:%d, MAL-NODE: DATA Intercept:%d, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %d\n", 
-						counter,intercept_on, MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
-				 printf("If GREY_SINK_HOLE_ATTACK == 0, it means BLACK_SINK_HOLE_ATTACK\n");
-				 
+				 printf("R:%d, MAL-NODE: DATA Intercept:%d, MALICIOUS_LEVEL:%d\n",
+				 			counter,intercept_on, MALICIOUS_LEVEL);
+				 if(GREY_SINK_HOLE_ATTACK){
+				 		printf("GREY_SINK_HOLE_ATTACK is activated...\n");
+				 } else{
+				 	printf("BLACK_SINK_HOLE_ATTACK is ACTIVE now...\n");
+				 }			 
 				 sprintf(buf, "R:%d,DATA INTERCEPT ON, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %d\n", 
 						MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
 				 uip_udp_packet_sendto(client_conn, buf, strlen(buf),

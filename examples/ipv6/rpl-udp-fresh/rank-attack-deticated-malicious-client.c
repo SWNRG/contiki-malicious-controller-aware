@@ -5,9 +5,7 @@
 #include "net/ipv6/uip-ds6.h"
 #include "net/ip/uip-udp-packet.h"
 
-//#include "net/rpl/rpl-conf.h" //coral
 #include "net/rpl/rpl.h"      //coral
-//#include "node-id.h"   // coral
 
 #include "dev/button-sensor.h"
 
@@ -26,9 +24,7 @@
 #include "net/ip/uip-debug.h"
 #endif
 
-#ifndef PERIOD
-#define PERIOD 500 /* increase it to 700 avoid flooding */
-#endif
+/* PERIOD defined in project-conf.h */
 
 #define START_INTERVAL		(15 * CLOCK_SECOND)
 #define SEND_INTERVAL		(PERIOD * CLOCK_SECOND)
@@ -51,14 +47,27 @@ extern   uip_ipaddr_t dao_prefix_own_ip;
 /* Monitor this var. When changed, the node has changed parent */
 static rpl_parent_t *my_cur_parent;
 static uip_ipaddr_t *my_cur_parent_ip;
+static int counter=0; //counting rounds. Not really needed
 
-/* When this variables is true, start sending UDP stats */
+/* When this variable is true, start sending UDP stats */
 static uint8_t sendUDP = 0; 
 
 /* When this variable is true, start sending ICMP stats */
 static uint8_t sendICMP = 0; 
 
-static int counter=0; //counting rounds.
+/* When true, the controller will start probing all nodes for detais */
+enablePanicButton = 0;
+
+/* When the controller detects version number attack, it orders to stop
+ * resetting the tricle timer. The variables below lie in rpl-dag.c
+ */
+#include "net/rpl/rpl-dag.c"
+extern uint8_t ignore_version_number_incos; //if == 1 DIO will not reset trickle
+extern uint8_t dio_bigger_than_dag; // if version attack, this will be 1
+extern uint8_t dio_smaller_than_dag; // if version attack, this will be 1
+ 
+static int prevICMRecv = 0;
+static int prevICMPSent = 0;
 
 /* uip6.c intercepting UDP packets */
 extern uint8_t intercept_on;
@@ -98,7 +107,7 @@ send_msg_to_sink(char *inMsg, uip_ipaddr_t *addr)
 
 	strcat(msg, buf);
 	
-	uip_udp_packet_sendto(client_conn, msg, strlen(msg),
+   uip_udp_packet_sendto(client_conn, msg, strlen(msg),
   			&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 }
 /*---------------------------------------------------------------------------*/
@@ -115,6 +124,7 @@ send_all_neighbors(void)
 		nbr = nbr_table_next(ds6_neighbors, nbr);
 		
 		send_msg_to_sink("N1:", nbr);
+		
 	}
 	PRINTF("End of neighbors\n"); 		
 }
@@ -136,37 +146,41 @@ tcpip_handler(void)
 		 /* Send the parent again, after sink's request */
 		 send_msg_to_sink("NP:", my_cur_parent_ip);  	 
 	 }else if(str[0] == 'N' && str[1] == '1'){ 
-			printf("Sink is probing my neighbors\n");		
+			printf("CO-MSG: Controller is probing my neighbors\n");		
 			send_all_neighbors();			
 	 }else if(str[0] == 'U' && str[1] == '1'){ 
-			printf("Start sending UDP stats\n"); //sink asking for UDP sent/recv		
+			printf("CO-MSG: Start sending UDP stats\n"); //sink asking for UDP sent/recv		
 			
 			sendUDP = 1;	
-				
-				
+			
 	 }else if(str[0] == 'U' && str[1] == '0'){ 
-			printf("Stop probing UDP stats\n"); 		
+			printf("CO-MSG: Stop probing UDP stats\n"); 		
 			
 			sendUDP = 0;		
-					
-					
-					
+		
 	 }else if(str[0] == 'I' && str[1] == '1'){ 
-			printf("Start sending ICMP stats\n"); //sink asking for UDP sent/recv		
+			printf("CO-MSG: Start sending ICMP stats\n"); //sink asking for UDP sent/recv		
 				
 			sendICMP = 1;	
-				
-				
+
 	 }else if(str[0] == 'I' && str[1] == '0'){ 
-			printf("Stop probing ICMP stats\n"); 	
+			printf("CO-MSG: Stop probing ICMP stats\n"); 	
 							
 			sendICMP = 0;					
-								
-								
-									
-	 }else if(str[0] == 'N' && str[1] == '0'){ 
-			printf("Stop sending neighbors\n"); 	
 					
+	 }else if(str[0] == 'N' && str[1] == '0'){ 
+			printf("CO-MSG: Stop sending neighbors\n"); 	
+	
+	 }else if(str[0] == 'T' && str[1] == '1'){
+	 			// sink orders to stop resetting trickle because version num attack
+	 			printf("CO-MSG: Stop resetting trickle timer ON\n"); 	 	
+				//ignore_version_number_incos = 1;	
+
+	 }else if(str[0] == 'T' && str[1] == '0'){
+	 			// sink orders to stop resetting trickle because version num attack
+	 			printf("CO-MSG: Stop resetting trickle timer OFF\n"); 	 	
+				//ignore_version_number_incos = 0;					
+
 	 }else{	 
 	 	PRINTF("DATA recv '%s' (s:%d, r:%d)\n", str, seq_id, reply);
 	 }
@@ -176,16 +190,16 @@ tcpip_handler(void)
 static void
 send_packet(void *ptr)
 {
-   char buf[MAX_PAYLOAD_LEN];
+  char buf[MAX_PAYLOAD_LEN];
 
-   seq_id++; // TODO: change this with a random var
+  seq_id++; // TODO: change this with a random var
 
-	PRINTF("DATA sending to %d 'Hello %d'\n",
-			server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], seq_id);
+  PRINTF("DATA sending to %d 'Hello %d'\n",
+         server_ipaddr.u8[sizeof(server_ipaddr.u8) - 1], seq_id);
 
-	sprintf(buf, "Custom Data %d ", seq_id);
-	uip_udp_packet_sendto(client_conn, buf, strlen(buf),
-					         &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+  sprintf(buf, "Custom Data %d ", seq_id);
+  uip_udp_packet_sendto(client_conn, buf, strlen(buf),
+                        &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 }
 /*-----------------------------------------------------------------------*/
 static void
@@ -232,13 +246,43 @@ set_global_address(void)
 #endif
 }
 /*-----------------------------------------------------------------------*/
+static void
+monitor_ver_num(void) //TODO: Implement this method
+{
+	static int ver_num_attacks = 0; // be careful, it could increase for ever!
+	char buf[MAX_PAYLOAD_LEN];
+	
+#define PRINT_DETAILS 0
+
+	if(dio_bigger_than_dag == 1 || dio_smaller_than_dag == 1 ){
+#if PRINT_DETAILS
+		printf("DIO dio_bigger_than_dag: %d\n",dio_bigger_than_dag);
+		printf("DIO dio_smaller_than_dag: %d\n",dio_smaller_than_dag);
+		printf("R:%d, VA:%d\n",counter,ver_num_attacks);
+#endif
+		sprintf(buf, "[VA:%d]",++ver_num_attacks);
+		uip_udp_packet_sendto(client_conn, buf, strlen(buf),
+					  &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
+	}	
+	// Hardcoding ver_num_attacks. Use the adaptable algorithm in ASSET paper
+	if(ver_num_attacks>20){
+		ignore_version_number_incos=1;
+		ver_num_attacks=20; //make sure that it does not crash...
+	}	     	
+	if(ignore_version_number_incos==1){
+#if PRINT_DETAILS
+		printf("ignore_version_number_incos: %d\n",ignore_version_number_incos);
+#endif
+	}	
+}
+/*-----------------------------------------------------------------------*/
 static void 
 monitor_DAO(void)
 {
 /* dont forget: parent_ip = 
  * rpl_get_parent_ipaddr(parent->dag->preferred_parent)
  */
-	uip_ipaddr_t *addr;
+	//uip_ipaddr_t *addr; // is this needed ???
 	
 #define PRINT_CHANGES 0
 
@@ -269,10 +313,12 @@ static void
 sendUDPStats(void)
 {
    char buf[MAX_PAYLOAD_LEN];
-	printf("MAL-NODE: Sending UDP stats to sink\n");
+#define PRINT_DET 0
+#if PRINT_DET   
+	printf("Sending UDP stats to sink\n");
 	printf("R:%d, udp_sent:%d\n",counter,uip_stat.udp.sent);
 	printf("R:%d, udp_recv:%d\n",counter,uip_stat.udp.recv);
-
+#endif
 	sprintf(buf, "[SU:%d %d]",uip_stat.udp.sent,uip_stat.udp.recv);
 	uip_udp_packet_sendto(client_conn, buf, strlen(buf),
 			     &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));		
@@ -281,139 +327,111 @@ sendUDPStats(void)
 sendICMPStats(void)
 {
    char buf[MAX_PAYLOAD_LEN];
-	printf("Sending ICMP stats to sink\n");
-
-	printf("R:%d, MAL-NODE: icmp_sent:%d\n",counter,uip_stat.icmp.sent);
-	printf("R:%d, MAL-NODE: icmp_recv:%d\n",counter,uip_stat.icmp.recv);
-
-	sprintf(buf, "[SI:%d %d]",uip_stat.icmp.sent,uip_stat.icmp.recv);
-	uip_udp_packet_sendto(client_conn, buf, strlen(buf),
-			     &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));				
+#define PRINT_DET 0
+#if PRINT_DET      
+		printf("Sending ICMP stats to sink\n");
+		printf("R:%d, icmp_sent:%d\n",counter,uip_stat.icmp.sent);
+		printf("R:%d, icmp_recv:%d\n",counter,uip_stat.icmp.recv);
+#endif
+		sprintf(buf, "[SI:%d %d]",uip_stat.icmp.sent,uip_stat.icmp.recv);
+		uip_udp_packet_sendto(client_conn, buf, strlen(buf),
+				     &server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));				
 }
 /*-----------------------------------------------------------------------*/
 PROCESS_THREAD(udp_client_process, ev, data)
 {
 	char buf[MAX_PAYLOAD_LEN];
 
-	static struct etimer periodic;
-	static struct ctimer backoff_timer;
+  static struct etimer periodic;
+  static struct ctimer backoff_timer;
+  
+  PROCESS_BEGIN();
+  PROCESS_PAUSE();
 
-	PROCESS_BEGIN();
-	PROCESS_PAUSE();
+  set_global_address();
 
-	set_global_address();
-	if(GREY_SINK_HOLE_ATTACK ==  1){
-		printf("Greyhole is on by 50%. Activate it by button\n");
-	}
-	else{
-		printf("Blackhole is on. Activate it by button\n");
-	}
+  /* The data sink runs with a 100% duty cycle in order to ensure high 
+     packet reception rates. */
+  NETSTACK_MAC.off(1);
+
+  PRINTF("UDP client process started nbr:%d routes:%d\n",
+         NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
+
+  print_local_addresses();	
+  printf("MALICIOUS_LEVEL: %d (if 0, no RANK ATTACK)\n",MALICIOUS_LEVEL);
 	
-	/* The data sink runs with a 100% duty cycle in order to ensure high 
-	  packet reception rates. */
-	NETSTACK_MAC.off(1);
+  /* new connection with remote host */
+  client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
+  if(client_conn == NULL) {
+    printf("No UDP connection available, exiting the process!\n");
+    PROCESS_EXIT();
+  }
+  udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
 
-	PRINTF("UDP client process started nbr:%d routes:%d\n",
-		   NBR_TABLE_CONF_MAX_NEIGHBORS, UIP_CONF_MAX_ROUTES);
+  // Destination PORT
+  server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
+  if(server_conn == NULL) {
+    printf("No UDP connection available, exiting the process!\n");
+    PROCESS_EXIT();
+  }
+  udp_bind(server_conn, UIP_HTONS(UDP_SERVER_PORT));
 
-	print_local_addresses();
-	printf("MALICIOUS_LEVEL: %d (if 0, no RANK ATTACK)\n",MALICIOUS_LEVEL);
-	
-	/* new connection with remote host */
-	client_conn = udp_new(NULL, UIP_HTONS(UDP_SERVER_PORT), NULL); 
-	if(client_conn == NULL) {
-	 printf("No UDP connection available, exiting the process!\n");
-	 PROCESS_EXIT();
-	}
-	udp_bind(client_conn, UIP_HTONS(UDP_CLIENT_PORT)); 
-
-	// Destination PORT
-	server_conn = udp_new(NULL, UIP_HTONS(UDP_CLIENT_PORT), NULL);
-	if(server_conn == NULL) {
-	 printf("MAL-NODE: No UDP connection available, exiting the process!\n");
-	 PROCESS_EXIT();
-	}
-	udp_bind(server_conn, UIP_HTONS(UDP_SERVER_PORT));
-
-	PRINTF("Created a connection with the server ");
-	PRINT6ADDR(&client_conn->ripaddr);
-	PRINTF(" local/remote port %u/%u\n",
-		UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
+  PRINTF("Created a connection with the server ");
+  PRINT6ADDR(&client_conn->ripaddr);
+  PRINTF(" local/remote port %u/%u\n",
+  		UIP_HTONS(client_conn->lport), UIP_HTONS(client_conn->rport));
 
 	/* make sure it is the same with the legitimate clients UDP period sending */
 	printf("MAL-NODE: PERIOD defined: %d\n",PERIOD);
+	
+	
+	// setting the attack from the begining. 
+	intercept_on = 1;
+	
+	
+#define FULL_MODE 0
+#if FULL_MODE      
+      sendICMP = 1 ;
+      sendUDP = 1;
+#endif 	
+				   	 
+  etimer_set(&periodic, SEND_INTERVAL);
+  while(1) {
+    PROCESS_YIELD();
 
-/* printing details for intercepted messages */
-#define PRINT_DETAILS 1
+/****** Close these two for Standard-RPL *********/
+    monitor_DAO();   
+    //monitor_ver_num();
+	 
+    if(ev == tcpip_event) {
+      tcpip_handler();
+    }
+    if(etimer_expired(&periodic)) {
+      etimer_reset(&periodic);
 
-	etimer_set(&periodic, SEND_INTERVAL);
-	while(1) {
-		PROCESS_YIELD();
+      counter++;     
+      
+      /* sending periodic data to sink (e.g. temperature measurements) */
+      ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL);   
 
-/* participating to slim-mode as a ''normal'' node */
-		monitor_DAO();
+		int ICMPSent = uip_stat.icmp.sent - prevICMPSent;
+		prevICMPSent = uip_stat.icmp.sent;
+		int ICMPRecv = uip_stat.icmp.recv - prevICMRecv;
+		prevICMRecv = uip_stat.icmp.recv;
+		
+/*************** Choose betweek total packets and current packets *****/	
+		//printf("R:%d, TOTAL_icmp_sent:%d\n",counter,uip_stat.icmp.sent);
+		//printf("R:%d, TOTAL_icmp_recv:%d\n",counter,uip_stat.icmp.recv);
+
+		printf("R:%d, CURRENT_icmp_sent:%d\n",counter,ICMPSent);
+		printf("R:%d, CURRENT_icmp_recv:%d\n",counter,ICMPRecv);	
+/***********************************************************************/
 
 
-		if(ev == tcpip_event) {
-			//tcpip_handler();
-		}
-
-		if(etimer_expired(&periodic)) {
-			etimer_reset(&periodic);
-
-			 counter++;	 
-			 PRINTF("Counter %d\n",counter); 
-			 
-			/* Implementing grayhole attack even at the attacker.
-			* This is kind of cheating, but it makes very easy for the graph
-			* algorithms to find the 'mother' of the attack, as a mother of a
-			* strongly connected graph. Else, there must be a routine to find 
-			* the common and unique ancestor of all attacked nodes. This is then
-			* the attacker.
-			*
-			* BE CAREFUL: random_rand() returns ONLY EVEN NUMBERS. Hence, %4
-			* will return either 0 or 2 (random boolean variable)
-			* 
-			* sendON = (int)random_rand()%2; 
-			* returns all zeros (0)
-			*/
-
-			if(intercept_on == 1){
-			  if(GREY_SINK_HOLE_ATTACK == 1){
-			  		//%2 returns only zeros
-			  		uint8_t randomSend = (uint8_t)random_rand()%100; 
-#if PRINT_DETAILS
-					printf("MAL-NODE: randomSend in malicious node:%d\n",randomSend);
-#endif				 	
-				 	/* decide randomly to send or not (greyhole attack) */	  
-					if(randomSend < 50 ){ //it seems more trully random like this...
-						ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL); 
-#if PRINT_DETAILS
-						printf("MAL-NODE: my UDP data RANDOMLY sent to sink...\n");  
-#endif
-					}else{ 
-#if PRINT_DETAILS
-						printf("MAL-NODE: my UDP data randomly NOT sent\n");
-#endif
-					}
-			 	}else{ /* intercept == 1 && GREY_SINK_HOLE_ATTACK == 0 */
-#if PRINT_DETAILS
-			 		printf("MAL-NODE: Blackhole attack ON, My msg dropped...\n");
-#endif
-			 	}			 		
-			}else{ /* intercept == 0, regular operation */
-						ctimer_set(&backoff_timer, SEND_TIME, send_packet, NULL); 
-#if PRINT_DETAILS
-						printf("my UDP data regularly sent to sink...\n");  
-#endif
-			}
-
-/* Check the 2nd thread for manual start/stop of malicious activities */
+/***** Check the 2nd thread for manual start/stop of malicious activities */
 			if (counter == 500){ //start malicious behavior
 				 intercept_on = 1;
-				 printf("R:%d, MAL-NODE: DATA Intercept:%d, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %d\n", 
-						counter,intercept_on, MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
-				 printf("If GREY_SINK_HOLE_ATTACK == 0, it means BLACK_SINK_HOLE_ATTACK\n");
+				 printf("R:%d, MAL-NODE: DATA Intercept STARTED\n");
 				 
 				 sprintf(buf, "R:%d,DATA INTERCEPT ON, MALICIOUS_LEVEL:%d, GREY_SINK_HOLE_ATTACK %d\n", 
 						MALICIOUS_LEVEL, GREY_SINK_HOLE_ATTACK);
@@ -423,27 +441,24 @@ PROCESS_THREAD(udp_client_process, ev, data)
 
 			if (counter == 500){ // end malicious behavior
 				 intercept_on = 0;
-				 printf("MAL-NODE: DATA Intercept:%d........................\n",counter,intercept_on);
+				 printf("R:%d, MAL-NODE: DATA Intercept ENDED\n");
 				 sprintf(buf, "DATA Intercept END........................\n");
 				 uip_udp_packet_sendto(client_conn, buf, strlen(buf),
 									&server_ipaddr, UIP_HTONS(UDP_SERVER_PORT));
 			}
+    }
 
-			/****** Nothing beyond this point ******************/
-			
-			if (sendUDP != 0){
-				sendUDPStats();   	
-			}
-
-			if (sendICMP != 0){
-				sendICMPStats();
-			}
-			 
-		} //etimer(&periodic)
-  } // while(1)
+    if (sendUDP != 0){
+   	sendUDPStats();   	
+    }
+   
+	 if (sendICMP != 0){
+		sendICMPStats(); 
+    }  
+  }
   PROCESS_END();
 }
-/*-----------------------------------------------------------------------*/
+/*---------------------------------------------------------*/
 static uint8_t active;
 PROCESS_THREAD(malicious_node_actions, ev, data)
 {
@@ -457,7 +472,7 @@ PROCESS_THREAD(malicious_node_actions, ev, data)
 			     data == &button_sensor);
     if(!active) {
 				 intercept_on = 1;
-				 printf("MAL-NODE: intercept ON\n");
+				 printf("MAL-NODE: Button pressed\n");
     } else {
       /* deactivate malicious actions */
 				 intercept_on = 0;

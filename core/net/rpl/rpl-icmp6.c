@@ -63,10 +63,21 @@
 
 #include "net/ip/uip-debug.h"
 
-/* George they will be sent to app layer for extra info to the sink */ 
-static  rpl_parent_t *dao_preffered_parent;
-static  uip_ipaddr_t *dao_preffered_parent_ip;
-static  uip_ipaddr_t dao_prefix_own_ip;
+// George June 2021 externilzing the variables. compiler error in iot-lab
+#include "net/rpl/icmp6-extern.h"
+
+/* George they will be sent to app layer for extra info to the sink 
+ * June 2021 All the following, moved to icmp6-extern.h
+ * because iot-lab did not compile
+ */ 
+rpl_parent_t *dao_preffered_parent;
+uip_ipaddr_t *dao_preffered_parent_ip;
+uip_ipaddr_t dao_prefix_own_ip;
+uint8_t dao_parent_set;
+
+/* NEEDED ONLY for poisoning the rank of the attacker node, to implement
+ * rank attack ONLY.
+ */  
 static int PARENT_SWITCH_THRESHOLD = 96;
 
 /*---------------------------------------------------------------------------*/
@@ -560,10 +571,11 @@ dio_output(rpl_instance_t *instance, uip_ipaddr_t *uc_addr)
  	  		PRINTF("No MALICIOUS_LEVEL set, NORMAL dag->rank\n");
  	  		fake_rank = dag->rank;
   }
-  printf("PARENT_SWITCH_THRESHOLD:%d, dag->rank:%d, fake:%d\n",
+  if(MALICIOUS_LEVEL>0){ // Don't print if the node is "NORMAL"
+  	 printf("PARENT_SWITCH_THRESHOLD:%d, dag->rank:%d, fake:%d\n",
   			PARENT_SWITCH_THRESHOLD, dag->rank,fake_rank);
-  PRINTF("MALICIOUS_LEVEL %d\n", MALICIOUS_LEVEL);
-
+  	 PRINTF("MALICIOUS_LEVEL %d\n", MALICIOUS_LEVEL);
+  }
   set16(buffer, pos, fake_rank);
   //set16(buffer, pos, dag->rank);
   
